@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  # --- 1. Read version from Cargo.toml; skip if this version was already released ---
+  check-version:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.read.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read version
+        id: read
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.read.outputs.tag }}" \
+               --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release ${{ steps.read.outputs.tag }} already exists - skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --- 2. Run tests (gate the release on green tests) ----------------------------
+  test:
+    name: Test
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test
+
+  # --- 3. Build for every target platform ----------------------------------------
+  build:
+    name: Build · ${{ matrix.target }}
+    needs: [ check-version, test ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl,  os: ubuntu-latest,  archive: tar.gz }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest,  archive: tar.gz }
+          - { target: x86_64-apple-darwin,        os: macos-latest,   archive: tar.gz }
+          - { target: aarch64-apple-darwin,       os: macos-latest,   archive: tar.gz }
+          - { target: x86_64-pc-windows-msvc,     os: windows-latest, archive: zip }
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Linux: cargo-zigbuild gives us static musl binaries for both x86_64 and
+      # aarch64 without needing Docker or a cross-compiler toolchain.
+      - name: Cache cargo-zigbuild
+        if: runner.os == 'Linux'
+        id: cache-zigbuild
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-zigbuild
+          key: cargo-zigbuild-${{ runner.os }}
+
+      - name: Install Zig
+        if: runner.os == 'Linux'
+        run: pip install ziglang
+
+      - name: Install cargo-zigbuild
+        if: runner.os == 'Linux' && steps.cache-zigbuild.outputs.cache-hit != 'true'
+        run: cargo install cargo-zigbuild --locked
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: cargo zigbuild --release --target ${{ matrix.target }}
+
+      # macOS and Windows use standard cargo - the runner already has the right toolchain.
+      - name: Build (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # -- Package ---------------------------------------------------------------
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          tar -czf pycu-${{ matrix.target }}.tar.gz \
+            -C target/${{ matrix.target }}/release pycu
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "target\${{ matrix.target }}\release\pycu.exe" `
+            -DestinationPath "pycu-${{ matrix.target }}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pycu-${{ matrix.target }}
+          path: pycu-${{ matrix.target }}.${{ matrix.archive }}
+          if-no-files-found: error
+
+  # --- 4. Create the GitHub Release and attach all binaries ----------------------
+  release:
+    name: Publish release
+    needs: [ check-version, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          sha256sum * > checksums.sha256
+          cat checksums.sha256
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.check-version.outputs.tag }}" \
+            --title "${{ needs.check-version.outputs.tag }}" \
+            --generate-notes \
+            artifacts/*
+
+  # --- 5. Publish to crates.io ------------------------------------------------
+  publish-crate:
+    name: Publish to crates.io
+    needs: [ check-version, release ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}

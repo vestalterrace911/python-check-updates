@@ -1,0 +1,18 @@
+coverage:
+  status:
+    project:
+      default:
+        # Allow up to 2% drop before CI fails
+        threshold: 2%
+
+# Exclude files whose core logic requires live network I/O or in-process
+# binary replacement - these cannot be safely exercised in unit tests.
+ignore:
+  - "src/main.rs"
+  - "src/cli.rs"
+  - "src/self_update.rs"
+  - "src/uninstall.rs"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default

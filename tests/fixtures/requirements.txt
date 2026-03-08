@@ -1,0 +1,15 @@
+# Core dependencies
+fastapi>=0.109.0
+pydantic>=1.10.0,<2.0.0
+uvicorn>=0.20
+
+# Dev dependencies
+pytest~=7.3.0
+ruff==0.1.6
+
+# These should be ignored
+-r base-requirements.txt
+--index-url https://pypi.org/simple/
+git+https://github.com/example/pkg.git
+./local-package
+pydantic[email]>=1.10.0  # extras are handled

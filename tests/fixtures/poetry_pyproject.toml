@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "example-app"
+version = "1.0.0"
+description = "An example app using Poetry"
+authors = ["Alice <alice@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+pydantic = "^1.10.0"
+uvicorn = ">=0.20"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "~7.3.0"
+ruff = "0.1.6"
