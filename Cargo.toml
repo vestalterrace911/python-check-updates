@@ -1,6 +1,6 @@
 [package]
 name = "pycu"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Check your Python dependencies for newer versions on PyPI"
@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
+dirs = "6"
 clap = { version = "4", features = ["derive"] }
 flate2 = "1"
 futures = "0.3"
@@ -34,4 +35,5 @@ toml = "1"
 zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+tempfile = "3"
 wiremock = "0.6"

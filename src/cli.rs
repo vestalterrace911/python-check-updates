@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -28,6 +29,12 @@ pub struct Cli {
     #[arg(short = 't', long, value_name = "LEVEL", default_value = "latest")]
     pub target: TargetLevel,
 
+    /// Preview all color schemes, or set one persistently.
+    /// Without a value: show all schemes visually.
+    /// With a value: save that scheme and exit.
+    #[arg(long, value_name = "SCHEME", num_args = 0..=1, default_missing_value = "")]
+    pub set_color_scheme: Option<String>,
+
     /// Update pycu itself to the latest release
     #[arg(long)]
     pub self_update: bool,
@@ -49,8 +56,48 @@ pub enum TargetLevel {
     Patch,
 }
 
+#[derive(ValueEnum, Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum ColorScheme {
+    /// #D73A49 / #0366D6 / #28A745 - GitHub-style SemVer severity (default)
+    Default,
+    /// #E69F00 / #0072B2 / #009E73 - Okabe–Ito, color-blind safe
+    OkabeIto,
+    /// #E74C3C / #F1C40F / #2ECC71 - traffic-light (red/yellow/green)
+    TrafficLight,
+    /// #8E44AD / #3498DB / #95A5A6 - monitoring style (purple/blue/gray)
+    Severity,
+    /// #CC79A7 / #0072B2 / #F0E442 - maximum distinction, color-blind safe
+    HighContrast,
+}
+
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    if let Some(raw) = cli.set_color_scheme {
+        if raw.is_empty() {
+            // --set-color-scheme used without a value: show the preview
+            crate::output::table::print_color_scheme_preview();
+        } else {
+            // --set-color-scheme <SCHEME>: parse, save, confirm
+            use clap::ValueEnum;
+            let scheme = ColorScheme::from_str(&raw, true).map_err(|e| anyhow::anyhow!(
+                "Unknown color scheme '{}'. {}\nRun `pycu --set-color-scheme` to see all options.",
+                raw, e
+            ))?;
+            let config = crate::config::Config {
+                color_scheme: scheme.clone(),
+            };
+            crate::config::save(&config)?;
+            let path = crate::config::config_path().unwrap_or_else(|| PathBuf::from("config.toml"));
+            println!(
+                "Color scheme set to '{}' and saved to {}.",
+                raw,
+                path.display()
+            );
+        }
+        return Ok(());
+    }
 
     // Self-update is independent of any project file
     if cli.self_update {
@@ -61,6 +108,12 @@ pub async fn run() -> anyhow::Result<()> {
     if cli.uninstall {
         return crate::uninstall::run();
     }
+
+    // Load persisted config, running first-run setup if no config exists or is unreadable
+    let config = match crate::config::load() {
+        Ok(Some(cfg)) => cfg,
+        Ok(None) | Err(_) => crate::config::first_run_setup()?,
+    };
 
     let file_path = match cli.file {
         Some(p) => p,
@@ -97,7 +150,7 @@ pub async fn run() -> anyhow::Result<()> {
         .collect();
 
     if cli.upgrade {
-        crate::output::table::print_table(&updates, false);
+        crate::output::table::print_table(&updates, false, &config.color_scheme);
         let count = crate::upgrade::apply_upgrades(&file_path, &updates)?;
         if count > 0 {
             println!(
@@ -113,7 +166,7 @@ pub async fn run() -> anyhow::Result<()> {
     if cli.json {
         crate::output::json::print_json(&updates)?;
     } else {
-        crate::output::table::print_table(&updates, true);
+        crate::output::table::print_table(&updates, true, &config.color_scheme);
     }
 
     Ok(())

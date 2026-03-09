@@ -5,9 +5,30 @@ pub fn run() -> Result<()> {
         .context("Could not determine the path of the current executable")?;
 
     remove_exe(&exe)?;
-
     println!("Removed {}.", exe.display());
+
+    remove_config();
+
     Ok(())
+}
+
+/// Remove the `pycu/` config directory (contains `config.toml`).
+/// Failures are non-fatal - the binary is already gone at this point.
+fn remove_config() {
+    let config_dir = dirs::config_dir().map(|d| d.join("pycu"));
+
+    match config_dir {
+        None => {}
+        Some(dir) if !dir.exists() => {}
+        Some(dir) => match std::fs::remove_dir_all(&dir) {
+            Ok(()) => println!("Removed config directory {}.", dir.display()),
+            Err(e) => eprintln!(
+                "Warning: could not remove config directory {}: {}",
+                dir.display(),
+                e
+            ),
+        },
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
