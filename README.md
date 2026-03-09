@@ -39,7 +39,8 @@ So I built pycu.
 - Filter by bump level: major, minor, or patch only
 - JSON output for scripting
 - Self-updates via `--self-update`
-- Color-coded output showing exactly which version component changed
+- Color-coded output showing exactly which version component changed, with 5 built-in color schemes including
+  color-blind safe options
 - SHA-256 verified self-update downloads
 
 ## Installation
@@ -76,6 +77,8 @@ cargo install --git https://github.com/Logic-py/python-check-updates
 pycu --uninstall
 ```
 
+This removes the `pycu` binary and its configuration directory.
+
 ## Usage
 
 Run in a directory that contains a `pyproject.toml` or `requirements.txt`:
@@ -92,16 +95,17 @@ pycu --file path/to/requirements.txt
 
 ### Options
 
-| Flag                | Short | Description                                                      |
-|---------------------|-------|------------------------------------------------------------------|
-| `--file <PATH>`     |       | Path to the dependency file (auto-detected if omitted)           |
-| `--upgrade`         | `-u`  | Rewrite the file in-place with updated constraints               |
-| `--target <LEVEL>`  | `-t`  | Only show `major`, `minor`, or `patch` bumps (default: `latest`) |
-| `--json`            |       | Output results as JSON                                           |
-| `--concurrency <N>` |       | Max concurrent PyPI requests (default: `10`)                     |
-| `--self-update`     |       | Update pycu itself to the latest release                         |
-| `--uninstall`       |       | Remove pycu from your system                                     |
-| `--version`         |       | Print the version                                                |
+| Flag                          | Short | Description                                                      |
+|-------------------------------|-------|------------------------------------------------------------------|
+| `--file <PATH>`               |       | Path to the dependency file (auto-detected if omitted)           |
+| `--upgrade`                   | `-u`  | Rewrite the file in-place with updated constraints               |
+| `--target <LEVEL>`            | `-t`  | Only show `major`, `minor`, or `patch` bumps (default: `latest`) |
+| `--json`                      |       | Output results as JSON                                           |
+| `--concurrency <N>`           |       | Max concurrent PyPI requests (default: `10`)                     |
+| `--set-color-scheme [SCHEME]` |       | Preview all color schemes, or save one persistently              |
+| `--self-update`               |       | Update pycu itself to the latest release                         |
+| `--uninstall`                 |       | Remove pycu from your system                                     |
+| `--version`                   |       | Print the version                                                |
 
 ### Examples
 
@@ -121,6 +125,30 @@ pycu --file requirements-dev.txt
 # Machine-readable output
 pycu --json
 ```
+
+### Color schemes
+
+pycu ships with five built-in color schemes. Your preference is saved to
+`~/.config/pycu/config.toml` (Linux/macOS) or `%APPDATA%\pycu\config.toml` (Windows) and
+applied automatically on every run.
+
+**Preview all schemes** (shown with live colored examples in your terminal):
+
+```sh
+pycu --set-color-scheme
+```
+
+**Set a scheme:**
+
+```sh
+pycu --set-color-scheme default       # red / blue / green - GitHub-style SemVer severity
+pycu --set-color-scheme okabe-ito     # orange / blue / teal - color-blind safe (Okabe-Ito)
+pycu --set-color-scheme traffic-light # red / yellow / green - classic CI model
+pycu --set-color-scheme severity      # purple / blue / gray - monitoring/observability style
+pycu --set-color-scheme high-contrast # magenta / blue / yellow - maximum distinction
+```
+
+On first run, pycu will show the preview and prompt you to choose a scheme interactively.
 
 ### JSON output
 

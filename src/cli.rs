@@ -61,7 +61,7 @@ pub enum TargetLevel {
 pub enum ColorScheme {
     /// #D73A49 / #0366D6 / #28A745 - GitHub-style SemVer severity (default)
     Default,
-    /// #E69F00 / #0072B2 / #009E73 - Okabe–Ito, color-blind safe
+    /// #E69F00 / #0072B2 / #009E73 - Okabe-Ito, color-blind safe
     OkabeIto,
     /// #E74C3C / #F1C40F / #2ECC71 - traffic-light (red/yellow/green)
     TrafficLight,

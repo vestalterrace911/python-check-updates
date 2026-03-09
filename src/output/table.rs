@@ -19,7 +19,7 @@ fn palette_for(scheme: &ColorScheme) -> Palette {
             minor: (3, 102, 214), // #0366D6  blue
             patch: (40, 167, 69), // #28A745  green
         },
-        // Okabe–Ito color-blind safe
+        // Okabe-Ito color-blind safe
         ColorScheme::OkabeIto => Palette {
             major: (230, 159, 0), // #E69F00  orange
             minor: (0, 114, 178), // #0072B2  blue
@@ -105,7 +105,7 @@ pub fn print_color_scheme_preview() {
         (
             "okabe-ito",
             ColorScheme::OkabeIto,
-            "Color-blind safe - Okabe–Ito palette",
+            "Color-blind safe - Okabe-Ito palette",
             ["orange #E69F00", "blue #0072B2", "teal #009E73"],
         ),
         (
@@ -249,6 +249,11 @@ mod tests {
             updated_constraint: updated.to_string(),
             bump_kind: bump,
         }
+    }
+
+    #[test]
+    fn test_print_color_scheme_preview_does_not_panic() {
+        print_color_scheme_preview();
     }
 
     #[test]

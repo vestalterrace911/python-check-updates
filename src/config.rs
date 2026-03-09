@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -35,11 +35,7 @@ pub fn load() -> Result<Option<Config>> {
         return Ok(None);
     }
 
-    let contents = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read config file: {}", path.display()))?;
-    let config: Config = toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
-    Ok(Some(config))
+    load_from_path(&path).map(Some)
 }
 
 pub fn save(config: &Config) -> Result<()> {
@@ -48,15 +44,7 @@ pub fn save(config: &Config) -> Result<()> {
         None => anyhow::bail!("Could not determine config directory"),
     };
 
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create config directory: {}", parent.display()))?;
-    }
-
-    let contents = toml::to_string(config).context("Failed to serialize config")?;
-    fs::write(&path, contents)
-        .with_context(|| format!("Failed to write config file: {}", path.display()))?;
-    Ok(())
+    save_to_path(config, &path)
 }
 
 /// Interactive first-run prompt. Shows the color scheme preview, asks the user to pick,
@@ -71,16 +59,8 @@ pub fn first_run_setup() -> Result<Config> {
 
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_lowercase();
 
-    let color_scheme = match input.as_str() {
-        "okabe-ito" => ColorScheme::OkabeIto,
-        "traffic-light" => ColorScheme::TrafficLight,
-        "severity" => ColorScheme::Severity,
-        "high-contrast" => ColorScheme::HighContrast,
-        _ => ColorScheme::Default,
-    };
-
+    let color_scheme = parse_scheme_input(&input);
     let config = Config { color_scheme };
     save(&config)?;
 
@@ -90,6 +70,36 @@ pub fn first_run_setup() -> Result<Config> {
     println!();
 
     Ok(config)
+}
+
+// ── Internal helpers (pub(crate) for testing) ────────────────────────────────
+
+pub(crate) fn load_from_path(path: &Path) -> Result<Config> {
+    let contents = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read config file: {}", path.display()))?;
+    toml::from_str(&contents)
+        .with_context(|| format!("Failed to parse config file: {}", path.display()))
+}
+
+pub(crate) fn save_to_path(config: &Config, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create config directory: {}", parent.display()))?;
+    }
+    let contents = toml::to_string(config).context("Failed to serialize config")?;
+    fs::write(path, contents)
+        .with_context(|| format!("Failed to write config file: {}", path.display()))
+}
+
+/// Parse a raw user input string into a `ColorScheme`, defaulting to `Default`.
+pub(crate) fn parse_scheme_input(input: &str) -> ColorScheme {
+    match input.trim().to_lowercase().as_str() {
+        "okabe-ito" => ColorScheme::OkabeIto,
+        "traffic-light" => ColorScheme::TrafficLight,
+        "severity" => ColorScheme::Severity,
+        "high-contrast" => ColorScheme::HighContrast,
+        _ => ColorScheme::Default,
+    }
 }
 
 #[cfg(test)]
@@ -131,23 +141,70 @@ mod tests {
     }
 
     #[test]
-    fn test_nonexistent_path_has_no_file() {
-        let fake_path = PathBuf::from("/nonexistent/pycu/config.toml");
-        assert!(!fake_path.exists());
+    fn test_save_to_path_creates_dirs_and_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("nested").join("pycu").join("config.toml");
+        let cfg = Config {
+            color_scheme: ColorScheme::Severity,
+        };
+        save_to_path(&cfg, &path).unwrap();
+        assert!(path.exists());
     }
 
     #[test]
-    fn test_save_and_load_roundtrip() {
+    fn test_load_from_path_roundtrip() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("config.toml");
-
         let cfg = Config {
-            color_scheme: ColorScheme::OkabeIto,
+            color_scheme: ColorScheme::TrafficLight,
         };
-        let contents = toml::to_string(&cfg).unwrap();
-        std::fs::write(&path, contents).unwrap();
+        save_to_path(&cfg, &path).unwrap();
+        let back = load_from_path(&path).unwrap();
+        assert_eq!(back.color_scheme, ColorScheme::TrafficLight);
+    }
 
-        let back: Config = toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(back.color_scheme, ColorScheme::OkabeIto);
+    #[test]
+    fn test_load_from_path_invalid_toml_returns_err() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "this is not valid toml !!!").unwrap();
+        let result = load_from_path(&path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn test_load_from_path_missing_file_returns_err() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("nonexistent.toml");
+        let result = load_from_path(&path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to read"));
+    }
+
+    #[test]
+    fn test_parse_scheme_input_all_variants() {
+        assert_eq!(parse_scheme_input("okabe-ito"), ColorScheme::OkabeIto);
+        assert_eq!(
+            parse_scheme_input("traffic-light"),
+            ColorScheme::TrafficLight
+        );
+        assert_eq!(parse_scheme_input("severity"), ColorScheme::Severity);
+        assert_eq!(
+            parse_scheme_input("high-contrast"),
+            ColorScheme::HighContrast
+        );
+        assert_eq!(parse_scheme_input("default"), ColorScheme::Default);
+        assert_eq!(parse_scheme_input(""), ColorScheme::Default);
+        assert_eq!(parse_scheme_input("unknown"), ColorScheme::Default);
+    }
+
+    #[test]
+    fn test_parse_scheme_input_trims_whitespace_and_ignores_case() {
+        assert_eq!(parse_scheme_input("  OKABE-ITO\n"), ColorScheme::OkabeIto);
+        assert_eq!(
+            parse_scheme_input("  Traffic-Light  "),
+            ColorScheme::TrafficLight
+        );
     }
 }
